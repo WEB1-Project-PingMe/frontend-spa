@@ -1,244 +1,232 @@
 'use client'
 
-import * as React from 'react'
 import {
-  Chat,
-  ChatInputArea,
-  ChatInputField,
-  ChatInputSubmit,
-  ChatViewport,
-  ChatMessages,
-  ChatMessageRow,
-  ChatMessageBubble,
-  ChatMessageTime,
-  ChatMessageAvatar,
-  type ChatSubmitEvent,
+    Chat,
+    ChatViewport,
+    ChatMessages,
+    ChatMessageRow,
+    ChatMessageBubble,
+    ChatMessageTime,
+    ChatMessageAvatar,
 } from '@/components/chat'
-import { ArrowUpIcon, Square, User } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { User } from 'lucide-react'
+import Pusher from 'pusher-js'
+import { useEffect, useMemo, useState } from 'react'
+import ChatInput from './chat-input'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-
-const MTPRZ_AVATAR = '/static/c/matiasperz.webp'
-const JOYCO_AVATAR = '/static/c/joyco.webp'
-const JOYBOY_AVATAR = '/static/c/joyboy.webp'
-const FABROOS_AVATAR = '/static/c/fabroos.webp'
-
-function ChatWindow() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { uuid } = useParams();
-  const { chatId } = location.state;
-  const [chat, setChat] = React.useState([])
-  const [input, setInput] = React.useState('')
-  const token = localStorage.getItem("sessionToken");
-  const userId = localStorage.getItem("currentUserId");
-
-  useEffect(() => {
-    // GET /conversations/messages?conversationId=507f1f77bcf86cd799439012&limit=20&before=2026-01-21T12:00:00.000Z
-    fetch(`https://pingme-backend-nu.vercel.app/conversations/messages?conversationId=${chatId}&limit=20`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token && {"Authorization": `Bearer ${token}`}),
-      }
-    })
-    .then(response => {
-      if (!response.ok)  {
-        if (response.status === 401) {
-          console.error('Unauthorized. Please check your session token.');
-          navigate("/login");
-        }
-      }
-      return response.json();
-    })
-    .then(data => {
-      const sortedMessages = data.messages.sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
-      setChat(sortedMessages);
-    })
-  }, [uuid]);
-
-  const updateMessageContent = React.useCallback(
-    (id: string, content: string) => {
-      setChat((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)))
-    },
-    []
-  )
-
-  const { stream, abort, isStreaming } = useStreamToken(updateMessageContent)
-
-  const sendMessage = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    if (isStreaming) {
-      abort()
-      return
-    }
-
-    const userId = localStorage.getItem("currentUserId");
-
-    const userMessage = {
-      text: input,
-      conversationId: chatId,
-      senderId: userId,
-    }
-    fetch('https://pingme-backend-nu.vercel.app/conversations/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem("sessionToken") && {"Authorization": `Bearer ${localStorage.getItem("sessionToken")}`}),
-      },
-      body: JSON.stringify(userMessage),
-    })
-    .then(response => {
-      if (!response.ok) throw new Error('Network response was not ok');
-      return response.json();
-    })
-    .then(data => {
-      console.log('Message sent successfully:', data);
-    })
-    .catch(error => {
-      console.error('Error sending message:', error);
-    });
-
-  }
-
-  const handleSubmit = (e: ChatSubmitEvent) => {
-    if (isStreaming) return
-
-    const userMessage: Message = {
-      type: 'message',
-      id: Date.now().toString(),
-      avatar: MTPRZ_AVATAR,
-      name: 'You',
-      content: e.message,
-      role: 'self',
-      timestamp: new Date(),
-    }
-
-    setChat((prev) => [...prev, userMessage])
-    setInput('')
-
-    // Simulate assistant response with typewriter effect
-    const responseText = ANSW_SET[Math.floor(Math.random() * ANSW_SET.length)]
-    const assistantId = (Date.now() + 1).toString()
-    const assistantTimestamp = new Date()
-
-    setChat((prev) => [
-      ...prev,
-      {
-        type: 'message',
-        id: assistantId,
-        avatar: JOYCO_AVATAR,
-        name: 'Assistant',
-        content: '',
-        fallback: 'A',
-        role: 'system',
-        timestamp: assistantTimestamp,
-      },
-    ])
-
-    stream(assistantId, responseText)
-  }
-
-  return (
-    <Chat onSubmit={handleSubmit}>
-      <div className="mx-auto flex w-full flex-col gap-4 px-4 py-6 h-full w-full">
-        <ChatViewport className="h-full justify-end">
-          <ChatMessages className="w-full py-3">
-            {chat.map((message) => {
-                return (
-                  <ChatMessageRow key={message._id} 
-                  variant={
-                    message.senderId === userId ? 'self' : 'peer'
-                  }
-                  >
-                    <ChatMessageAvatar>
-                      <User />
-                    </ChatMessageAvatar>
-                    <ChatMessageTime dateTime={new Date(message.updatedAt)} />
-                    <ChatMessageBubble>{message.text}</ChatMessageBubble>
-                  </ChatMessageRow>
-                )
-            })}
-          </ChatMessages>
-        </ChatViewport>
-
-        <ChatInputArea>
-          <ChatInputField
-            multiline
-            placeholder="Type type type!"
-            value={input}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              setInput(e.target.value)
-            }
-          />
-          <ChatInputSubmit
-            onClick={(e) => sendMessage(e)}
-            disabled={!input.trim() && !isStreaming}
-          >
-            {isStreaming ? (
-              <Square className="size-[1em] fill-current" />
-            ) : (
-              <ArrowUpIcon className="size-[1.2em]" />
-            )}
-            <span className="sr-only">
-              {isStreaming ? 'Stop streaming' : 'Send'}
-            </span>
-          </ChatInputSubmit>
-        </ChatInputArea>
-      </div>
-    </Chat>
-  )
+type ChatMessage = {
+    _id: string
+    text: string
+    senderId: string
+    updatedAt: string
 }
 
-function useStreamToken(
-  onUpdate: (id: string, content: string) => void,
-  options?: { minDelay?: number; maxDelay?: number }
-) {
-  const { minDelay = 30, maxDelay = 80 } = options ?? {}
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [isStreaming, setIsStreaming] = React.useState(false)
+const toChatMessage = (value: unknown): ChatMessage | null => {
+    if (!value || typeof value !== 'object') {
+        return null
+    }
 
-  const stream = React.useCallback(
-    (id: string, text: string) => {
-      const tokens = text.split(/(\s+)/).filter(Boolean)
-      let tokenIndex = 0
-      setIsStreaming(true)
+    const maybeMessage = value as Partial<ChatMessage> & {
+        createdAt?: string
+        message?: Partial<ChatMessage> & { createdAt?: string }
+    }
+    const source = maybeMessage.message ?? maybeMessage
+    const messageTime = source.updatedAt ?? source.createdAt
 
-      const streamToken = () => {
-        if (tokenIndex >= tokens.length) {
-          setIsStreaming(false)
-          return
+    if (!source._id || !source.text || !source.senderId || !messageTime) {
+        return null
+    }
+
+    return {
+        _id: String(source._id),
+        text: String(source.text),
+        senderId: String(source.senderId),
+        updatedAt: String(messageTime),
+    }
+}
+
+const sortMessages = (messages: ChatMessage[]) =>
+    [...messages].sort(
+        (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+    )
+
+function ChatWindow() {
+    const navigate = useNavigate()
+    const queryClient = useQueryClient()
+    const location = useLocation()
+    const { uuid } = useParams()
+    const chatId = (location.state as { chatId?: string } | null)?.chatId
+    const [input, setInput] = useState('')
+    const token = localStorage.getItem('sessionToken')
+    const userId = localStorage.getItem('currentUserId')
+
+    const messagesQueryKey = useMemo(
+        () => ['conversation-messages', chatId, uuid, token] as const,
+        [chatId, token, uuid]
+    )
+
+    const { data: chat = [] } = useQuery<ChatMessage[]>({
+        queryKey: messagesQueryKey,
+        queryFn: async () => {
+            if (!chatId) {
+                return []
+            }
+
+            const response = await fetch(
+                `https://pingme-backend-nu.vercel.app/conversations/messages?conversationId=${chatId}&limit=20`,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token && { Authorization: `Bearer ${token}` }),
+                    },
+                }
+            )
+
+            if (response.status === 401) {
+                navigate('/login')
+                return []
+            }
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch messages')
+            }
+
+            const data = await response.json()
+            const messages = (data.messages as ChatMessage[] | undefined) ?? []
+            return sortMessages(messages)
+        },
+        enabled: Boolean(chatId),
+        staleTime: 15_000,
+    })
+
+    useEffect(() => {
+        const pusherKey = 'd8e5b208992682efa26f'
+        const pusherCluster = 'eu'
+
+        if (!chatId) {
+            return
         }
 
-        tokenIndex++
-        const currentContent = tokens.slice(0, tokenIndex).join('')
-        onUpdate(id, currentContent)
+        const pusher = new Pusher(pusherKey, {
+            cluster: pusherCluster,
+            forceTLS: true,
+        })
 
-        const delay = minDelay + Math.random() * (maxDelay - minDelay)
-        timeoutRef.current = setTimeout(streamToken, delay)
-      }
+        const chatListChannel = pusher.subscribe('chat')
+        const messageChannel = pusher.subscribe(`chat-${chatId}`)
 
-      streamToken()
-    },
-    [onUpdate, minDelay, maxDelay]
-  )
+        const handleNewChat = () => {
+            queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        }
 
-  const abort = React.useCallback(() => {
-    setIsStreaming(false)
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
+        const handleIncomingMessage = (payload: unknown) => {
+            const incomingMessage = toChatMessage(payload)
+            if (!incomingMessage) {
+                return
+            }
+
+            queryClient.setQueryData<ChatMessage[]>(messagesQueryKey, (previous = []) => {
+                const existingIds = new Set(previous.map((message) => message._id))
+                if (existingIds.has(incomingMessage._id)) {
+                    return previous
+                }
+                return sortMessages([...previous, incomingMessage])
+            })
+
+            queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        }
+
+        chatListChannel.bind('new-chat', handleNewChat)
+        messageChannel.bind('new-message', handleIncomingMessage)
+
+        return () => {
+            chatListChannel.unbind('new-chat', handleNewChat)
+            messageChannel.unbind('new-message', handleIncomingMessage)
+            pusher.unsubscribe('chat')
+            pusher.unsubscribe(`chat-${chatId}`)
+            pusher.disconnect()
+        }
+    }, [chatId, messagesQueryKey, queryClient])
+
+    const sendMessageMutation = useMutation({
+        mutationFn: async (messageText: string) => {
+            if (!chatId) {
+                return null
+            }
+
+            const userMessage = {
+                text: messageText,
+                conversationId: chatId,
+                senderId: userId,
+            }
+
+            const response = await fetch('https://pingme-backend-nu.vercel.app/conversations/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { Authorization: `Bearer ${token}` }),
+                },
+                body: JSON.stringify(userMessage),
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to send message')
+            }
+
+            return response.json()
+        },
+        onSuccess: (data) => {
+            setInput('')
+            const messageFromResponse = toChatMessage(data)
+            if (messageFromResponse) {
+                queryClient.setQueryData<ChatMessage[]>(messagesQueryKey, (previous = []) => {
+                    const existingIds = new Set(previous.map((message) => message._id))
+                    if (existingIds.has(messageFromResponse._id)) {
+                        return previous
+                    }
+                    return sortMessages([...previous, messageFromResponse])
+                })
+            }
+            queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        },
+    })
+
+    const sendMessage = () => {
+        const trimmed = input.trim()
+        if (!trimmed || sendMessageMutation.isPending) {
+            return
+        }
+
+        sendMessageMutation.mutate(trimmed)
     }
-  }, [])
 
-  React.useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [])
-
-  return { stream, abort, isStreaming }
+    return (
+        <Chat>
+            <div className="mx-auto flex h-full w-full flex-col gap-4 px-4 py-6">
+                <ChatViewport className="h-full justify-end">
+                    <ChatMessages className="w-full py-3">
+                        {chat.map((message) => (
+                            <ChatMessageRow key={message._id} variant={message.senderId === userId ? 'self' : 'peer'}>
+                                <ChatMessageAvatar>
+                                    <User />
+                                </ChatMessageAvatar>
+                                <ChatMessageTime dateTime={new Date(message.updatedAt)} />
+                                <ChatMessageBubble>{message.text}</ChatMessageBubble>
+                            </ChatMessageRow>
+                        ))}
+                    </ChatMessages>
+                </ChatViewport>
+                <ChatInput
+                    input={input}
+                    isSending={sendMessageMutation.isPending}
+                    onInputChange={setInput}
+                    onSend={sendMessage}
+                />
+            </div>
+        </Chat>
+    )
 }
 
 export default ChatWindow

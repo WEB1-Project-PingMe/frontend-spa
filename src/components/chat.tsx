@@ -515,7 +515,6 @@ type ChatInputProps =
   | ({ multiline: false } & InputProps)
 
 export function ChatInputField({ ref, ...rest }: ChatInputProps) {
-  const { inputRef } = useChatContext()
   // const composedRef = useComposedRefs<HTMLInputElement | HTMLTextAreaElement>(
   //   ref,
   //   inputRef
