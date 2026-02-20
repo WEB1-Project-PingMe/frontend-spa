@@ -1,15 +1,16 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import React, { useEffect } from 'react';
+import { Navigate, Outlet } from 'react-router-dom'
 
-const ProtectedRoute = ({ isAuthenticated }) => {
+type ProtectedRouteProps = {
+  isAuthenticated: boolean
+}
+
+const ProtectedRoute = ({ isAuthenticated }: ProtectedRouteProps) => {
 
   if (!isAuthenticated) {
-    // 'replace' prevents the user from hitting 'back' to the locked page
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />
   }
 
-  // Outlet renders the child routes defined in your App.js
-  return <Outlet />;
-};
+  return <Outlet />
+}
 
-export default ProtectedRoute;
+export default ProtectedRoute

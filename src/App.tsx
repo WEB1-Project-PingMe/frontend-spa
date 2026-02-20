@@ -5,6 +5,7 @@ import { ThemeProvider } from './components/theme-provider'
 import  Login from './components/login'
 import ProtectedRoute from './components/protected-route'
 import ExploreComp from './components/explore'
+import Register from './components/register'
 import { BrowserRouter } from 'react-router'
 import { Route, Routes } from 'react-router-dom'
 import { useState } from 'react'
@@ -22,6 +23,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Login tryAuth={handleAuthentication} />} />
             <Route path="/login" element={<Login tryAuth={handleAuthentication}  />} />
+            <Route path="/register" element={<Register />} />
             test12345
             <Route element ={<ProtectedRoute isAuthenticated={authenticated} />}>
               <Route path="chats" element={<ChatLayoutGrid />}>

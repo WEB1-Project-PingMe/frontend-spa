@@ -5,6 +5,7 @@ import {
 
 export default [
   route("/", "./App.tsx"),
+  route("register", "./component/register.tsx"),
   route("login", "./component/login.tsx"),
   route("chats", "./component/chat-layout.tsx"),
   route("chats/:uuid", "./component/chat-layout.tsx"),

@@ -72,7 +72,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         }
       })
       .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.error('Unauthorized. Please check your session token.');
+            navigate("/login");
+          }
+          throw new Error('Network response was not ok');
+        }
         return response.json();
       })
       .then(data => {

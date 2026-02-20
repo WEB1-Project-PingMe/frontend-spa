@@ -14,7 +14,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link, useLocation } from "react-router-dom"
 import { useEffect } from "react"
 
 export function LoginForm({
@@ -23,10 +23,12 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { forceToLogin } = location.state || false;
 
   useEffect(() => {
     const token = localStorage.getItem("sessionToken");
-    if (token) {
+    if (token && !forceToLogin) {
       authenicate(true);
       navigate("/chats");
     }
@@ -105,7 +107,7 @@ export function LoginForm({
               <Field>
                 <Button type="submit">Login</Button>
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
+                  Don&apos;t have an account? <Link to="/register" className="text-sm underline">Register</Link>
                 </FieldDescription>
               </Field>
             </FieldGroup>

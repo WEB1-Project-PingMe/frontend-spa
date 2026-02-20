@@ -16,7 +16,8 @@ import {
 } from '@/components/chat'
 import { ArrowUpIcon, Square, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useLocation, useParams, useNavigate } from 'react-router-dom'
+
 
 const MTPRZ_AVATAR = '/static/c/matiasperz.webp'
 const JOYCO_AVATAR = '/static/c/joyco.webp'
@@ -24,6 +25,7 @@ const JOYBOY_AVATAR = '/static/c/joyboy.webp'
 const FABROOS_AVATAR = '/static/c/fabroos.webp'
 
 function ChatWindow() {
+  const navigate = useNavigate();
   const location = useLocation();
   const { uuid } = useParams();
   const { chatId } = location.state;
@@ -41,7 +43,12 @@ function ChatWindow() {
       }
     })
     .then(response => {
-      if (!response.ok) throw new Error('Network response was not ok');
+      if (!response.ok)  {
+        if (response.status === 401) {
+          console.error('Unauthorized. Please check your session token.');
+          navigate("/login");
+        }
+      }
       return response.json();
     })
     .then(data => {
