@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import { ArchiveX, Command, File, Inbox, Send, Trash2, CircleUser } from "lucide-react"
 
 import { NavUser } from "@/components/nav-user"
@@ -19,7 +18,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
-import { Link } from 'react-router'
+import { NavLink } from 'react-router'
+import { useState, useEffect } from "react"
+import { formatDistanceToNow } from "date-fns"
+import { Button } from "@/components/ui/button"
+import { Plus, Bot } from "lucide-react"
+import { SearchUserDialog } from "./search-user-dialog"
+import { useNavigate, useLocation } from "react-router-dom"
 
 // This is sample data
 const data = {
@@ -31,97 +36,77 @@ const data = {
   navMain: [
     {
       title: "pingME",
-      url: "#",
+      url: "chats",
       icon: Inbox,
       isActive: true,
     },
     {
-      title: "Drafts",
-      url: "#",
+      title: "Explore",
+      url: "explore",
       icon: File,
       isActive: false,
-    },
-  ],
-
-  chats: [
-    {
-      name: "William Smith",
-      userImage: "example.png",
-      date: "09:34 AM",
-      message: "test message",
-      id: "124566"
-    },
-    {
-      name: "Alice Smith",
-      userImage: "example.png",
-      date: "Yesterday",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "Bob Johnson",
-      userImage: "example.png",
-      date: "2 days ago",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "Emily Davis",
-      userImage: "example.png",
-      date: "2 days ago",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "Michael Wilson",
-      date: "1 week ago",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "Sarah Brown",
-      email: "sarahbrown@example.com",
-      userImage: "example.png",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "David Lee",
-      email: "davidlee@example.com",
-      userImage: "example.png",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "Olivia Wilson",
-      userImage: "example.png",
-      date: "1 week ago",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "James Martin",
-      userImage: "example.png",
-      date: "1 week ago",
-      message: "test message",
-      id: "1235343"
-    },
-    {
-      name: "Sophia White",
-      email: "sophiawhite@example.com",
-      userImage: "example.png",
-      message: "test message",
-      id: "1235343"
     }
   ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { pathname } = location;
   // Note: I'm using state to show active item.
   // IRL you should use the url/router.
-  const [activeItem, setActiveItem] = React.useState(data.navMain[0])
-  const [chats, setchats] = React.useState(data.chats)
+  const [activeItem, setActiveItem] = useState(data.navMain[0])
+  const [chats, setchats] = useState(data.chats)
   const { setOpen } = useSidebar()
+  const [conversations, setConversations] = useState([]);
+
+  const [user, setUser] = useState(data.user);
+
+  function getConversations() {
+    const token = localStorage.getItem("sessionToken");
+    try {
+      fetch('https://pingme-backend-nu.vercel.app/conversations', {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && {"Authorization": `Bearer ${token}`}),
+        }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.json();
+      })
+      .then(data => {
+        setConversations(data.conversations);
+      })
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  }
+
+  useEffect(() => {
+    getConversations();
+  }, []);
+
+  const updateData = (url) => {
+    // Fetch explore data here if needed
+    if(url === "explore") {
+      setConversations([
+        {
+          _id: "explore-1",
+          updatedAt: new Date().toISOString(),
+          participants: [
+            {
+              _id: "user-1",
+              name: "Weather Bot",
+              tag: "exploreuser1#1234",
+            }
+          ],
+        }
+      ])
+    } else {
+      getConversations();
+    }
+  }
 
   return (
     <Sidebar
@@ -129,31 +114,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
       {...props}
     >
-      {/* This is the first sidebar */}
-      {/* We disable collapsible and adjust width to icon. */}
-      {/* This will make the sidebar appear as icons. */}
       <Sidebar
         collapsible="none"
         className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
       >
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" asChild className="md:h-8 md:p-0">
-                {/* TODO: update this */}
-                <a href="#">
-                  <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                    <Command className="size-4" />
-                  </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">Acme Inc</span>
-                    <span className="truncate text-xs">Enterprise</span>
-                  </div>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent className="px-1.5 md:px-0">
@@ -167,16 +131,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       }}
                       onClick={() => {
                         setActiveItem(item)
-                        const chat = data.chats.sort(() => Math.random() - 0.5)
-                        setchats(
-                          chat.slice(
-                            0,
-                            Math.max(5, Math.floor(Math.random() * 10) + 1)
-                          )
-                        )
                         setOpen(true)
+                        navigate("/" + item.url)
+                        updateData(item.url)
                       }}
-                      isActive={activeItem?.title === item.title}
                       className="px-2.5 md:px-2"
                     >
                       <item.icon />
@@ -201,30 +159,50 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <div className="text-foreground text-base font-medium">
               {activeItem?.title}
             </div>
+            <SearchUserDialog />
           </div>
-          <SidebarInput placeholder="Type to search..." />
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup className="px-0">
             <SidebarGroupContent>
-             {chats.map((chat) => (
-                <Link
-                  to={"/chat/" + chat.id}
-                  key={chat.name}
-                  className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
-                >
-                  <CircleUser size={32} />
-                  <div className="flex w-[75%] flex-col">
-                    <div className="flex w-full items-center gap-2">
-                      <span>{chat.name}</span>{" "}
-                      <span className="ml-auto text-xs">{chat.date}</span>
-                    </div>
-                    <span className="line-clamp-2 w-[260px] text-xs whitespace-break-spaces">
-                      {chat.message}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+              {activeItem.url === "explore" && (
+                  conversations.map((chat) => (
+                    <NavLink
+                      to={"/explore/" + chat.participants[0].name}
+                      key={chat._id} // Changed key to ID for better stability
+                      state={{ chatId: chat._id }}
+                      className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
+                    >
+                      <Bot size={32} />
+                      <div className="flex w-[75%] flex-col">
+                        <div className="flex w-full items-center gap-2">
+                          <span>{chat.participants[0].name}</span>
+                          <span className="ml-auto text-xs">
+                            {formatDistanceToNow(new Date(chat.updatedAt))}
+                          </span>
+                        </div>
+                      </div>
+                    </NavLink>
+                  ))
+                )} 
+               {activeItem.url === "chats" && (
+                 conversations.map((chat) => (
+                    <NavLink
+                      to={"/chats/" + chat._id}
+                      key={chat.participants[0].tag}
+                      state={{ chatId: chat._id }}
+                      className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
+                    >
+                      <CircleUser size={32} />
+                      <div className="flex w-[75%] flex-col">
+                        <div className="flex w-full items-center gap-2">
+                          <span>{chat.participants[0].name}</span>{" "}
+                          <span className="ml-auto text-xs">{formatDistanceToNow(chat.updatedAt)}</span>
+                        </div>
+                      </div>
+                    </NavLink>
+                  ))
+               )}
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>

@@ -5,5 +5,9 @@ import {
 
 export default [
   route("/", "./App.tsx"),
-  route("chat/:uuid", "./component/chat-window.tsx"),
+  route("login", "./component/login.tsx"),
+  route("chats", "./component/chat-layout.tsx"),
+  route("chats/:uuid", "./component/chat-layout.tsx"),
+  route("explore", "./component/chat-layout.tsx"),
+  route("explore/:name", "./component/explore.tsx"),
 ] satisfies RouteConfig;

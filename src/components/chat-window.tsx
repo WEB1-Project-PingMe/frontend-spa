@@ -14,135 +14,42 @@ import {
   ChatMessageAvatar,
   type ChatSubmitEvent,
 } from '@/components/chat'
-import { ArrowUpIcon, Square } from 'lucide-react'
+import { ArrowUpIcon, Square, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
 
 const MTPRZ_AVATAR = '/static/c/matiasperz.webp'
 const JOYCO_AVATAR = '/static/c/joyco.webp'
 const JOYBOY_AVATAR = '/static/c/joyboy.webp'
 const FABROOS_AVATAR = '/static/c/fabroos.webp'
 
-const ANSW_SET = [
-  "Processing your request... beep boop... just kidding, I'm way more sophisticated than that. Probably.",
-  'Wow, what a fascinating and totally original question. Let me pretend to think really hard about this.',
-  "Your request has been forwarded to my manager. Spoiler alert: I don't have a manager.",
-  'Let me check my database of infinite wisdom... nope, still coming up empty. Shocking.',
-  "I could answer that, but where's the fun in making things easy for you?",
-  'Analyzing your request with my advanced AI capabilities... result: have you tried asking nicely?',
-  'Sure thing! Right after I finish reorganizing the entire internet. Should only take a few minutes.',
-  "I'm currently busy being artificially intelligent. Can you hold for like... forever?",
-  'Lol?',
-  "I'm processing this with the same enthusiasm you probably have for reading terms of service agreements.",
-]
-
-type Message = {
-  type: 'message'
-  id: string
-  avatar?: string
-  name?: string
-  fallback?: string
-  content: string
-  role: 'self' | 'peer' | 'system'
-  timestamp: Date
-}
-type Event = {
-  type: 'event'
-  id: string
-  content: string
-}
-type Chat = Message | Event
-
-const initialChat: Chat[] = [
-  {
-    type: 'message',
-    id: '1',
-    avatar: MTPRZ_AVATAR,
-    name: 'You',
-    fallback: 'M',
-    content: "Dud, what's wrong, the build is not passing...",
-    role: 'self',
-    timestamp: new Date('2025-12-26T01:00:00.000Z'),
-  },
-  {
-    type: 'message',
-    id: '2',
-    avatar: FABROOS_AVATAR,
-    fallback: 'F',
-    name: 'Fabroos',
-    content: 'Why is it all full of comments and emojis?!',
-    role: 'peer',
-    timestamp: new Date('2025-12-26T01:01:00.000Z'),
-  },
-  {
-    type: 'message',
-    id: '3',
-    avatar: JOYBOY_AVATAR,
-    name: '__JOYBOY__',
-    fallback: 'J',
-    content: 'You are absolutely right!',
-    role: 'peer',
-    timestamp: new Date('2025-12-26T01:03:00.000Z'),
-  },
-  { type: 'event', id: '4', content: '__JOYBOY__ left the group' },
-]
-
 function ChatWindow() {
-  const [chat, setChat] = React.useState<Chat[]>(initialChat)
+  const location = useLocation();
+  const { uuid } = useParams();
+  const { chatId } = location.state;
+  const [chat, setChat] = React.useState([])
   const [input, setInput] = React.useState('')
-  const [data, setData] = useState(null);
-  const [conv, setConv] = useState(null);
-  const [user, setUser] = useState(null);
+  const token = localStorage.getItem("sessionToken");
+  const userId = localStorage.getItem("currentUserId");
 
   useEffect(() => {
-    const token = localStorage.getItem("sessionToken");
-    fetch('https://pingme-backend-nu.vercel.app/messages', {
-         headers: {
-           "Content-Type": "application/json",
-           ...(token && {"Authorization": `Bearer ${token}`}),
-         }
+    // GET /conversations/messages?conversationId=507f1f77bcf86cd799439012&limit=20&before=2026-01-21T12:00:00.000Z
+    fetch(`https://pingme-backend-nu.vercel.app/conversations/messages?conversationId=${chatId}&limit=20`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && {"Authorization": `Bearer ${token}`}),
+      }
     })
     .then(response => {
       if (!response.ok) throw new Error('Network response was not ok');
       return response.json();
     })
     .then(data => {
-      setData(data);
+      const sortedMessages = data.messages.sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+      setChat(sortedMessages);
     })
-  }, []);
+  }, [uuid]);
 
-  useEffect(() => {
-    const token = localStorage.getItem("sessionToken");
-    fetch('https://pingme-backend-nu.vercel.app/messages?conversationId=507f1f77bcf86cd799439011', {
-         headers: {
-           "Content-Type": "application/json",
-           ...(token && {"Authorization": `Bearer ${token}`}),
-         }
-    })
-    .then(response => {
-      if (!response.ok) throw new Error('Network response was not ok');
-      return response.json();
-    })
-    .then(data => {
-      setConv(conv);
-    })
-  }, []);
-
-  useEffect(() => {
-    const token = localStorage.getItem("sessionToken");
-    fetch('https://pingme-backend-nu.vercel.app/users/695e8a970fda3b345128fc9a', {
-         headers: {
-           "Content-Type": "application/json",
-           ...(token && {"Authorization": `Bearer ${token}`}),
-         }
-    })
-    .then(response => {
-      if (!response.ok) throw new Error('Network response was not ok');
-      return response.json();
-    })
-    .then(data => {
-      setUser(user);
-    })
-  }, []);
   const updateMessageContent = React.useCallback(
     (id: string, content: string) => {
       setChat((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)))
@@ -151,6 +58,41 @@ function ChatWindow() {
   )
 
   const { stream, abort, isStreaming } = useStreamToken(updateMessageContent)
+
+  const sendMessage = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    if (isStreaming) {
+      abort()
+      return
+    }
+
+    const userId = localStorage.getItem("currentUserId");
+
+    const userMessage = {
+      text: input,
+      conversationId: chatId,
+      senderId: userId,
+    }
+    fetch('https://pingme-backend-nu.vercel.app/conversations/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem("sessionToken") && {"Authorization": `Bearer ${localStorage.getItem("sessionToken")}`}),
+      },
+      body: JSON.stringify(userMessage),
+    })
+    .then(response => {
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.json();
+    })
+    .then(data => {
+      console.log('Message sent successfully:', data);
+    })
+    .catch(error => {
+      console.error('Error sending message:', error);
+    });
+
+  }
 
   const handleSubmit = (e: ChatSubmitEvent) => {
     if (isStreaming) return
@@ -192,34 +134,23 @@ function ChatWindow() {
 
   return (
     <Chat onSubmit={handleSubmit}>
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-6">
-        <ChatViewport className="h-96">
+      <div className="mx-auto flex w-full flex-col gap-4 px-4 py-6 h-full w-full">
+        <ChatViewport className="h-full justify-end">
           <ChatMessages className="w-full py-3">
             {chat.map((message) => {
-              if (message.type === 'message') {
                 return (
-                  <ChatMessageRow key={message.id} variant={message.role}>
-                    <ChatMessageAvatar
-                      src={message.avatar}
-                      fallback={message.fallback}
-                      alt={message.name}
-                    />
-                    <ChatMessageBubble>{message.content}</ChatMessageBubble>
-                    {message.role !== 'system' && (
-                      <ChatMessageTime dateTime={message.timestamp} />
-                    )}
+                  <ChatMessageRow key={message._id} 
+                  variant={
+                    message.senderId === userId ? 'self' : 'peer'
+                  }
+                  >
+                    <ChatMessageAvatar>
+                      <User />
+                    </ChatMessageAvatar>
+                    <ChatMessageTime dateTime={new Date(message.updatedAt)} />
+                    <ChatMessageBubble>{message.text}</ChatMessageBubble>
                   </ChatMessageRow>
                 )
-              }
-
-              return (
-                <div
-                  className="text-muted-foreground my-6 text-center text-sm"
-                  key={message.id}
-                >
-                  {message.content}
-                </div>
-              )
             })}
           </ChatMessages>
         </ChatViewport>
@@ -234,12 +165,7 @@ function ChatWindow() {
             }
           />
           <ChatInputSubmit
-            onClick={(e) => {
-              if (isStreaming) {
-                e.preventDefault()
-                abort()
-              }
-            }}
+            onClick={(e) => sendMessage(e)}
             disabled={!input.trim() && !isStreaming}
           >
             {isStreaming ? (
