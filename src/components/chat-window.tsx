@@ -65,7 +65,7 @@ function ChatWindow() {
     const queryClient = useQueryClient()
     const location = useLocation()
     const { uuid } = useParams()
-    const chatId = (location.state as { chatId?: string } | null)?.chatId
+    const chatId = (location.state as { chatId?: string } | null)?.chatId ?? uuid
     const [input, setInput] = useState('')
     const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
     const token = localStorage.getItem('sessionToken')

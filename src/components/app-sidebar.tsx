@@ -114,10 +114,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const navigate = useNavigate()
     const location = useLocation()
     const queryClient = useQueryClient()
-    const [activeItem, setActiveItem] = useState(data.navMain[0])
     const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null)
     const { setOpen, isMobile, setOpenMobile } = useSidebar()
     const isChatsRoute = location.pathname.startsWith("/chats")
+    const activeItem = useMemo(
+        () => data.navMain.find((item) => location.pathname.startsWith(`/${item.url}`)) ?? data.navMain[0],
+        [location.pathname]
+    )
+
+    const closeMobileSidebar = () => {
+        if (isMobile) {
+            setOpenMobile(false)
+        }
+    }
 
     const token = localStorage.getItem("sessionToken")
     const { data: conversations = [] } = useQuery<Conversation[]>({
@@ -256,35 +265,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                                 hidden: false,
                                             }}
                                             onClick={() => {
-                                                setActiveItem(item)
                                                 if (isMobile) {
-                                                    const firstDirectConversation = directConversations[0]
-                                                    const firstGroup = groups[0]
-                                                    const firstExplore = exploreConversations[0]
-
-                                                    if (item.url === "chats" && firstDirectConversation) {
-                                                        setOpenMobile(false)
-                                                        navigate("/chats/" + firstDirectConversation._id, {
-                                                            state: { chatId: firstDirectConversation._id },
-                                                        })
-                                                        return
-                                                    }
-
-                                                    if (item.url === "groups" && firstGroup) {
-                                                        setOpenMobile(false)
-                                                        navigate("/groups/" + firstGroup._id, {
-                                                            state: { chatId: firstGroup._id },
-                                                        })
-                                                        return
-                                                    }
-
-                                                    if (item.url === "explore" && firstExplore) {
-                                                        setOpenMobile(false)
-                                                        navigate("/explore/" + firstExplore.participants[0].name, {
-                                                            state: { chatId: firstExplore._id },
-                                                        })
-                                                        return
-                                                    }
+                                                    setOpenMobile(false)
+                                                    navigate("/" + item.url)
+                                                    return
                                                 }
 
                                                 setOpen(true)
@@ -323,6 +307,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         to={"/explore/" + chat.participants[0].name}
                                         key={chat._id}
                                         state={{ chatId: chat._id }}
+                                        onClick={closeMobileSidebar}
                                         className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
                                     >
                                         <Bot size={32} />
@@ -341,6 +326,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         to={"/chats/" + chat._id}
                                         key={chat._id}
                                         state={{ chatId: chat._id }}
+                                        onClick={closeMobileSidebar}
                                         className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-2 border-b px-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
                                     >
                                         <CircleUser size={32} />
@@ -390,6 +376,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         to={"/groups/" + group._id}
                                         key={group._id}
                                         state={{ chatId: group._id }}
+                                        onClick={closeMobileSidebar}
                                         className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
                                     >
                                         <Users size={32} />
