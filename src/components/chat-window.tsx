@@ -9,12 +9,20 @@ import {
     ChatMessageTime,
     ChatMessageAvatar,
 } from '@/components/chat'
-import { User } from 'lucide-react'
+import { EllipsisVertical, Trash2, User } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { useEffect, useMemo, useState } from 'react'
 import ChatInput from './chat-input'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 
 type ChatMessage = {
     _id: string
@@ -59,6 +67,7 @@ function ChatWindow() {
     const { uuid } = useParams()
     const chatId = (location.state as { chatId?: string } | null)?.chatId
     const [input, setInput] = useState('')
+    const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
     const token = localStorage.getItem('sessionToken')
     const userId = localStorage.getItem('currentUserId')
 
@@ -193,6 +202,85 @@ function ChatWindow() {
         },
     })
 
+    const deleteMessageMutation = useMutation({
+        mutationFn: async (messageId: string) => {
+            if (!chatId) {
+                throw new Error('Missing conversation id')
+            }
+
+            const baseUrl = 'https://pingme-backend-nu.vercel.app/conversations/messages'
+            const authHeaders = {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
+            }
+
+            const attempts = [
+                () => fetch(`${baseUrl}/${messageId}`, { method: 'DELETE', headers: authHeaders }),
+                () =>
+                    fetch(
+                        `${baseUrl}?messageId=${encodeURIComponent(messageId)}&conversationId=${encodeURIComponent(chatId)}`,
+                        {
+                            method: 'DELETE',
+                            headers: authHeaders,
+                        }
+                    ),
+                () =>
+                    fetch(baseUrl, {
+                        method: 'DELETE',
+                        headers: authHeaders,
+                        body: JSON.stringify({
+                            messageId,
+                            conversationId: chatId,
+                        }),
+                    }),
+            ]
+
+            let lastError: Error | null = null
+
+            for (const runAttempt of attempts) {
+                const response = await runAttempt()
+
+                if (response.status === 401) {
+                    navigate('/login')
+                    throw new Error('Unauthorized')
+                }
+
+                if (response.ok) {
+                    return messageId
+                }
+
+                lastError = new Error(`Delete failed with status ${response.status}`)
+            }
+
+            throw lastError ?? new Error('Failed to delete message')
+        },
+        onMutate: async (messageId) => {
+            setDeletingMessageId(messageId)
+            await queryClient.cancelQueries({ queryKey: messagesQueryKey })
+            const previousMessages = queryClient.getQueryData<ChatMessage[]>(messagesQueryKey) ?? []
+
+            queryClient.setQueryData<ChatMessage[]>(messagesQueryKey, (current = []) =>
+                current.filter((message) => message._id !== messageId)
+            )
+
+            return { previousMessages }
+        },
+        onError: (_error, _messageId, context) => {
+            if (context?.previousMessages) {
+                queryClient.setQueryData(messagesQueryKey, context.previousMessages)
+            }
+            toast.error('Failed to delete message', { position: 'top-right' })
+        },
+        onSuccess: () => {
+            toast.success('Message deleted', { position: 'top-right' })
+            queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        },
+        onSettled: () => {
+            setDeletingMessageId(null)
+            queryClient.invalidateQueries({ queryKey: messagesQueryKey })
+        },
+    })
+
     const sendMessage = () => {
         const trimmed = input.trim()
         if (!trimmed || sendMessageMutation.isPending) {
@@ -209,9 +297,40 @@ function ChatWindow() {
                     <ChatMessages className="w-full py-3">
                         {chat.map((message) => (
                             <ChatMessageRow key={message._id} variant={message.senderId === userId ? 'self' : 'peer'}>
-                                <ChatMessageAvatar>
-                                    <User />
-                                </ChatMessageAvatar>
+                                {message.senderId === userId ? (
+                                    <div className="[grid-area:avatar] flex items-end">
+                                        <ChatMessageAvatar className="ml-2">
+                                            <User />
+                                        </ChatMessageAvatar>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    className="size-7"
+                                                    disabled={deletingMessageId === message._id}
+                                                >
+                                                    <EllipsisVertical className="size-4" />
+                                                    <span className="sr-only">Message actions</span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    variant="destructive"
+                                                    disabled={deletingMessageId === message._id}
+                                                    onClick={() => deleteMessageMutation.mutate(message._id)}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                    Delete message
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                ) : (
+                                    <ChatMessageAvatar>
+                                        <User />
+                                    </ChatMessageAvatar>
+                                )}
                                 <ChatMessageTime dateTime={new Date(message.updatedAt)} />
                                 <ChatMessageBubble>{message.text}</ChatMessageBubble>
                             </ChatMessageRow>

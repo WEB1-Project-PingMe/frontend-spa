@@ -2,11 +2,12 @@ import './App.css'
 import ChatLayoutGrid from './components/chat-layout'
 import ChatWindow from './components/chat-window'
 import { ThemeProvider } from './components/theme-provider'
-import  Login from './components/login'
+import Login from './components/login'
 import ProtectedRoute from './components/protected-route'
 import ExploreComp from './components/explore'
 import Register from './components/register'
 import GroupsChat from './components/groups-chat'
+import { Toaster } from './components/ui/sonner'
 import { BrowserRouter } from 'react-router'
 import { Route, Routes } from 'react-router-dom'
 import { useState } from 'react'
@@ -21,23 +22,24 @@ function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-          <Routes>
-            <Route path="/" element={<Login tryAuth={handleAuthentication} />} />
-            <Route path="/login" element={<Login tryAuth={handleAuthentication}  />} />
-            <Route path="/register" element={<Register />} />
-            test12345
-            <Route element ={<ProtectedRoute isAuthenticated={authenticated} />}>
-              <Route path="chats" element={<ChatLayoutGrid />}>
-                <Route path=":uuid" element={ <ChatWindow /> } />
-              </Route>
-              <Route path="explore" element={<ChatLayoutGrid />}>
-                <Route path=":uuid" element={ <ExploreComp /> } />
-              </Route>
-              <Route path="groups" element={<ChatLayoutGrid />}>
-                <Route path=":uuid" element={ <GroupsChat /> } />
-              </Route>
+        <Toaster position="top-right" />
+        <Routes>
+          <Route path="/" element={<Login tryAuth={handleAuthentication} />} />
+          <Route path="/login" element={<Login tryAuth={handleAuthentication} />} />
+          <Route path="/register" element={<Register />} />
+          test12345
+          <Route element={<ProtectedRoute isAuthenticated={authenticated} />}>
+            <Route path="chats" element={<ChatLayoutGrid />}>
+              <Route path=":uuid" element={<ChatWindow />} />
             </Route>
-          </Routes>
+            <Route path="explore" element={<ChatLayoutGrid />}>
+              <Route path=":uuid" element={<ExploreComp />} />
+            </Route>
+            <Route path="groups" element={<ChatLayoutGrid />}>
+              <Route path=":uuid" element={<GroupsChat />} />
+            </Route>
+          </Route>
+        </Routes>
       </ThemeProvider>
     </BrowserRouter>
   )

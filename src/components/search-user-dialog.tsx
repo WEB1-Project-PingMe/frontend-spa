@@ -14,6 +14,7 @@ import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, ChevronRightIcon } from "lucide-react"
 import { useState } from "react"
+import { toast } from "sonner"
 
 type FoundUser = {
     _id: string
@@ -24,6 +25,8 @@ export function SearchUserDialog() {
     const token = localStorage.getItem("sessionToken")
     const queryClient = useQueryClient()
     const [searchTerm, setSearchTerm] = useState("")
+    const [open, setOpen] = useState(false)
+    const [pendingUserId, setPendingUserId] = useState<string | null>(null)
 
     const { data: foundUsers = [] } = useQuery<FoundUser[]>({
         queryKey: ["user-search", searchTerm, token],
@@ -65,15 +68,31 @@ export function SearchUserDialog() {
 
             return response.json()
         },
-        onSuccess: () => {
+        onMutate: (user) => {
+            setPendingUserId(user._id)
+        },
+        onSuccess: (_data, user) => {
             queryClient.invalidateQueries({ queryKey: ["conversations"] })
+            toast.success(`Conversation with ${user.name} created`, {
+                position: "top-right",
+            })
+            setOpen(false)
+            setSearchTerm("")
+        },
+        onError: () => {
+            toast.error("Could not create conversation", {
+                position: "top-right",
+            })
+        },
+        onSettled: () => {
+            setPendingUserId(null)
         },
     })
 
     return (
-        <Dialog>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => setSearchTerm("a")}>
+                <Button variant="outline" size="icon-sm" onClick={() => setSearchTerm("a")}>
                     <Plus />
                 </Button>
             </DialogTrigger>
@@ -104,13 +123,27 @@ export function SearchUserDialog() {
                                 variant="outline"
                                 size="sm"
                                 className="mb-2"
-                                onClick={() => createConversationMutation.mutate(user)}
+                                style={{
+                                    pointerEvents: createConversationMutation.isPending ? "none" : "auto",
+                                    opacity: createConversationMutation.isPending ? 0.7 : 1,
+                                    cursor: createConversationMutation.isPending ? "not-allowed" : "pointer",
+                                }}
+                                onClick={() => {
+                                    if (createConversationMutation.isPending) {
+                                        return
+                                    }
+                                    createConversationMutation.mutate(user)
+                                }}
                             >
                                 <ItemContent>
                                     <ItemTitle>{user.name}</ItemTitle>
                                 </ItemContent>
                                 <ItemActions>
-                                    <ChevronRightIcon className="size-4" />
+                                    {createConversationMutation.isPending && pendingUserId === user._id ? (
+                                        <span className="text-xs text-muted-foreground">Creating...</span>
+                                    ) : (
+                                        <ChevronRightIcon className="size-4" />
+                                    )}
                                 </ItemActions>
                             </Item>
                         ))}

@@ -1,6 +1,6 @@
 "use client"
 
-import { File, Inbox, Users, CircleUser, Bot } from "lucide-react"
+import { File, Inbox, Users, CircleUser, Bot, EllipsisVertical, Trash2 } from "lucide-react"
 
 import { NavUser } from "@/components/nav-user"
 import {
@@ -19,8 +19,16 @@ import { NavLink } from "react-router"
 import { useMemo, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { SearchUserDialog } from "./search-user-dialog"
-import { useNavigate } from "react-router-dom"
-import { useQuery } from "@tanstack/react-query"
+import { useLocation, useNavigate } from "react-router-dom"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Button } from "@/components/ui/button"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 
 type NavMainItem = {
     title: string
@@ -104,8 +112,12 @@ const exploreConversations: Conversation[] = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const navigate = useNavigate()
+    const location = useLocation()
+    const queryClient = useQueryClient()
     const [activeItem, setActiveItem] = useState(data.navMain[0])
+    const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null)
     const { setOpen, isMobile, setOpenMobile } = useSidebar()
+    const isChatsRoute = location.pathname.startsWith("/chats")
 
     const token = localStorage.getItem("sessionToken")
     const { data: conversations = [] } = useQuery<Conversation[]>({
@@ -172,6 +184,58 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         }
         return directConversations
     }, [activeItem.url, directConversations])
+
+    const deleteConversationMutation = useMutation({
+        mutationFn: async (conversationId: string) => {
+            const headers = {
+                "Content-Type": "application/json",
+                ...(token && { Authorization: `Bearer ${token}` }),
+            }
+
+            const response = await fetch(
+                `https://pingme-backend-nu.vercel.app/contacts/${conversationId}`,
+                {
+                    method: "DELETE",
+                    headers,
+                }
+            )
+
+            if (response.status === 401) {
+                navigate("/login")
+                throw new Error("Unauthorized")
+            }
+
+            if (response.ok) {
+                return conversationId
+            }
+
+            throw new Error("Failed to delete conversation")
+        },
+        onMutate: async (conversationId) => {
+            setDeletingConversationId(conversationId)
+            await queryClient.cancelQueries({ queryKey: ["conversations", token] })
+            const previousConversations = queryClient.getQueryData<Conversation[]>(["conversations", token]) ?? []
+
+            queryClient.setQueryData<Conversation[]>(["conversations", token], (current = []) =>
+                current.filter((conversation) => conversation._id !== conversationId)
+            )
+
+            return { previousConversations }
+        },
+        onError: (_error, _conversationId, context) => {
+            if (context?.previousConversations) {
+                queryClient.setQueryData(["conversations", token], context.previousConversations)
+            }
+            toast.error("Could not delete contact", { position: "top-right" })
+        },
+        onSuccess: () => {
+            toast.success("Contact deleted", { position: "top-right" })
+        },
+        onSettled: () => {
+            setDeletingConversationId(null)
+            queryClient.invalidateQueries({ queryKey: ["conversations", token] })
+        },
+    })
 
     return (
         <Sidebar
@@ -247,7 +311,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarHeader className="gap-3.5 border-b p-4">
                     <div className="flex w-full items-center justify-between">
                         <div className="text-foreground text-base font-medium">{activeItem?.title}</div>
-                        <SearchUserDialog />
+                        {isChatsRoute ? <SearchUserDialog /> : null}
                     </div>
                 </SidebarHeader>
                 <SidebarContent>
@@ -277,16 +341,47 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         to={"/chats/" + chat._id}
                                         key={chat._id}
                                         state={{ chatId: chat._id }}
-                                        className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
+                                        className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-2 border-b px-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
                                     >
                                         <CircleUser size={32} />
-                                        <div className="flex w-[75%] flex-col">
+                                        <div className="flex min-w-0 flex-1 flex-col">
                                             <div className="flex w-full items-center gap-2">
-                                                <span>{chat.participants[0]?.name}</span>{" "}
-                                                <span className="ml-auto text-xs">{formatDistanceToNow(new Date(chat.lastMessageAt || chat.updatedAt))}</span>
+                                                <span className="text-base">{chat.participants[0]?.name}</span>{" "}
+                                                <span className="ml-auto text-xs text-gray-500">{formatDistanceToNow(new Date(chat.lastMessageAt || chat.updatedAt))}</span>
                                             </div>
                                             <span className="text-xs text-muted-foreground truncate">{chat.lastMessageText}</span>
                                         </div>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon-sm"
+                                                    className="size-7"
+                                                    disabled={deletingConversationId === chat._id}
+                                                    onClick={(event) => {
+                                                        event.preventDefault()
+                                                        event.stopPropagation()
+                                                    }}
+                                                >
+                                                    <EllipsisVertical className="size-4" />
+                                                    <span className="sr-only">Chat actions</span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    variant="destructive"
+                                                    disabled={deletingConversationId === chat._id}
+                                                    onClick={(event) => {
+                                                        event.preventDefault()
+                                                        event.stopPropagation()
+                                                        deleteConversationMutation.mutate(chat.participants[0]?._id)
+                                                    }}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                    Delete contact
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </NavLink>
                                 ))}
                             {activeItem.url === "groups" &&
