@@ -6,6 +6,7 @@ import  Login from './components/login'
 import ProtectedRoute from './components/protected-route'
 import ExploreComp from './components/explore'
 import Register from './components/register'
+import GroupsChat from './components/groups-chat'
 import { BrowserRouter } from 'react-router'
 import { Route, Routes } from 'react-router-dom'
 import { useState } from 'react'
@@ -31,6 +32,9 @@ function App() {
               </Route>
               <Route path="explore" element={<ChatLayoutGrid />}>
                 <Route path=":uuid" element={ <ExploreComp /> } />
+              </Route>
+              <Route path="groups" element={<ChatLayoutGrid />}>
+                <Route path=":uuid" element={ <GroupsChat /> } />
               </Route>
             </Route>
           </Routes>
