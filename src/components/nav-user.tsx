@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
+import { SquareUserRound } from "lucide-react"
 
 type UserData = {
     name: string
@@ -81,10 +82,10 @@ export function NavUser({
             <SidebarMenuItem>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <SidebarMenuButton size="lg" className="md:h-8 md:p-0">
-                            <Avatar className="h-8 w-8 rounded-lg">
-                                <AvatarFallback className="rounded-lg">
-                                    {safeUser.name?.substring(0, 2).toUpperCase()}
+                        <SidebarMenuButton className="md:h-8 md:p-0 hover:text-accent bg-transparent">
+                            <Avatar className="h-8 w-8 rounded-md">
+                                <AvatarFallback className="rounded-md">
+                                    <SquareUserRound />
                                 </AvatarFallback>
                             </Avatar>
                         </SidebarMenuButton>

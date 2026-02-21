@@ -204,8 +204,8 @@ function ChatWindow() {
 
     return (
         <Chat>
-            <div className="mx-auto flex h-full w-full flex-col gap-4 px-4 py-6">
-                <ChatViewport className="h-full justify-end">
+            <div className="mx-auto flex h-full min-w-0 w-full flex-col gap-3 px-3 py-4 sm:gap-4 sm:px-4 sm:py-6">
+                <ChatViewport className="min-h-0 flex-1 justify-end">
                     <ChatMessages className="w-full py-3">
                         {chat.map((message) => (
                             <ChatMessageRow key={message._id} variant={message.senderId === userId ? 'self' : 'peer'}>

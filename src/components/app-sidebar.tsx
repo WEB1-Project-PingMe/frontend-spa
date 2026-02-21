@@ -1,6 +1,6 @@
 "use client"
 
-import { File, Inbox, CircleUser, Bot } from "lucide-react"
+import { File, Inbox, Users, CircleUser, Bot } from "lucide-react"
 
 import { NavUser } from "@/components/nav-user"
 import {
@@ -29,30 +29,26 @@ type NavMainItem = {
     isActive: boolean
 }
 
-// {
-//     "_id": "69981bdab2a125fc56815923",
-//     "participants": [
-//         {
-//             "_id": "69947446ae7ba15e645c13de",
-//             "name": "firefox",
-//             "tag": "8Ulgj0C5"
-//         }
-//     ],
-//     "lastMessageAt": "2026-02-20T11:05:38.513Z",
-//     "lastMessageText": "Test Nachricht",
-//     "updatedAt": "2026-02-20T11:05:38.619Z",
-//     "createdAt": "2026-02-20T08:31:22.969Z"
-// }
 type Conversation = {
     _id: string
     updatedAt: string
     lastMessageAt: string
     lastMessageText: string
+    isGroup?: boolean
+    name?: string
     participants: Array<{
         _id: string
         name: string
         tag: string
     }>
+}
+
+type Group = {
+    _id: string
+    name: string
+    memberIds: string[]
+    createdAt: string
+    updatedAt: string
 }
 
 const data: {
@@ -76,6 +72,12 @@ const data: {
             isActive: true,
         },
         {
+            title: "Groups",
+            url: "groups",
+            icon: Users,
+            isActive: false,
+        },
+        {
             title: "Explore",
             url: "explore",
             icon: File,
@@ -86,7 +88,7 @@ const data: {
 
 const exploreConversations: Conversation[] = [
     {
-        _id: "explore-1",
+        _id: "explore-weather-bot",
         lastMessageAt: new Date().toISOString(),
         lastMessageText: "Current weather update",
         updatedAt: new Date().toISOString(),
@@ -103,7 +105,7 @@ const exploreConversations: Conversation[] = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const navigate = useNavigate()
     const [activeItem, setActiveItem] = useState(data.navMain[0])
-    const { setOpen } = useSidebar()
+    const { setOpen, isMobile, setOpenMobile } = useSidebar()
 
     const token = localStorage.getItem("sessionToken")
     const { data: conversations = [] } = useQuery<Conversation[]>({
@@ -131,12 +133,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         staleTime: 30_000,
     })
 
+    const { data: groups = [] } = useQuery<Group[]>({
+        queryKey: ["groups", token],
+        queryFn: async () => {
+            const response = await fetch("https://pingme-backend-nu.vercel.app/groups", {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token && { Authorization: `Bearer ${token}` }),
+                },
+            })
+
+            if (response.status === 401) {
+                navigate("/login")
+                return []
+            }
+
+            if (!response.ok) {
+                throw new Error("Failed to fetch groups")
+            }
+
+            const payload = await response.json()
+            if (Array.isArray(payload)) {
+                return payload as Group[]
+            }
+            return (payload.groups as Group[] | undefined) ?? []
+        },
+        staleTime: 30_000,
+    })
+
+    const directConversations = useMemo(
+        () => conversations.filter((conversation) => !conversation.isGroup && conversation.participants.length <= 2),
+        [conversations]
+    )
+
     const displayConversations = useMemo(() => {
         if (activeItem.url === "explore") {
             return exploreConversations
         }
-        return conversations
-    }, [activeItem.url, conversations])
+        return directConversations
+    }, [activeItem.url, directConversations])
 
     return (
         <Sidebar
@@ -158,6 +193,36 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             }}
                                             onClick={() => {
                                                 setActiveItem(item)
+                                                if (isMobile) {
+                                                    const firstDirectConversation = directConversations[0]
+                                                    const firstGroup = groups[0]
+                                                    const firstExplore = exploreConversations[0]
+
+                                                    if (item.url === "chats" && firstDirectConversation) {
+                                                        setOpenMobile(false)
+                                                        navigate("/chats/" + firstDirectConversation._id, {
+                                                            state: { chatId: firstDirectConversation._id },
+                                                        })
+                                                        return
+                                                    }
+
+                                                    if (item.url === "groups" && firstGroup) {
+                                                        setOpenMobile(false)
+                                                        navigate("/groups/" + firstGroup._id, {
+                                                            state: { chatId: firstGroup._id },
+                                                        })
+                                                        return
+                                                    }
+
+                                                    if (item.url === "explore" && firstExplore) {
+                                                        setOpenMobile(false)
+                                                        navigate("/explore/" + firstExplore.participants[0].name, {
+                                                            state: { chatId: firstExplore._id },
+                                                        })
+                                                        return
+                                                    }
+                                                }
+
                                                 setOpen(true)
                                                 navigate("/" + item.url)
                                             }}
@@ -221,6 +286,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                                 <span className="ml-auto text-xs">{formatDistanceToNow(new Date(chat.lastMessageAt || chat.updatedAt))}</span>
                                             </div>
                                             <span className="text-xs text-muted-foreground truncate">{chat.lastMessageText}</span>
+                                        </div>
+                                    </NavLink>
+                                ))}
+                            {activeItem.url === "groups" &&
+                                groups.map((group) => (
+                                    <NavLink
+                                        to={"/groups/" + group._id}
+                                        key={group._id}
+                                        state={{ chatId: group._id }}
+                                        className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex items-center gap-4 border-b pl-4 py-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
+                                    >
+                                        <Users size={32} />
+                                        <div className="flex w-[75%] flex-col">
+                                            <div className="flex w-full items-center gap-2">
+                                                <span>{group.name || "Unnamed Group"}</span>
+                                                <span className="ml-auto text-xs">{formatDistanceToNow(new Date(group.updatedAt || group.createdAt))}</span>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground truncate">{group.memberIds.length} members</span>
                                         </div>
                                     </NavLink>
                                 ))}

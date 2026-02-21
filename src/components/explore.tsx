@@ -12,7 +12,6 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
 import ChatInput from './chat-input'
 
 type WeatherData = {
@@ -29,6 +28,11 @@ type WeatherQueryResult = {
     message: string | null
 }
 
+type WeatherErrorResponse = {
+    error?: string
+    message?: string
+}
+
 type ExploreMessage = {
     id: string
     role: 'self' | 'peer'
@@ -37,15 +41,15 @@ type ExploreMessage = {
 }
 
 function ExploreComp() {
-    const { uuid } = useParams()
     const token = localStorage.getItem('sessionToken')
-    const routeCity = decodeURIComponent(uuid ?? '')
+    const routeCity = ''
 
     const [cityInput, setCityInput] = useState(routeCity)
     const [selectedCity, setSelectedCity] = useState('')
     const [requestSeq, setRequestSeq] = useState(0)
     const [messages, setMessages] = useState<ExploreMessage[]>([])
     const handledResponseSeqRef = useRef(0)
+    const noMatchingLocationMessage = 'No matching location found.'
 
     useEffect(() => {
         setCityInput(routeCity)
@@ -63,6 +67,19 @@ function ExploreComp() {
                     },
                 }
             )
+
+            if (response.status === 500) {
+                const errorPayload = (await response.json().catch(() => null)) as WeatherErrorResponse | null
+                if (
+                    errorPayload?.error === 'WeatherAPI error' &&
+                    errorPayload?.message === noMatchingLocationMessage
+                ) {
+                    return {
+                        weather: null,
+                        message: `City "${selectedCity}" not found.`,
+                    }
+                }
+            }
 
             if (response.status === 404) {
                 return {
@@ -102,6 +119,7 @@ function ExploreComp() {
         staleTime: 60_000,
         gcTime: 5 * 60_000,
         refetchOnWindowFocus: false,
+        retry: false,
         enabled: Boolean(selectedCity.trim()),
     })
 
@@ -162,8 +180,8 @@ function ExploreComp() {
 
     return (
         <Chat>
-            <div className="mx-auto flex h-full w-full flex-col gap-4 px-4 py-6">
-                <ChatViewport className="h-full justify-end">
+            <div className="mx-auto flex h-full min-w-0 w-full flex-col gap-3 px-3 py-4 sm:gap-4 sm:px-4 sm:py-6">
+                <ChatViewport className="min-h-0 flex-1 justify-end">
                     <ChatMessages className="w-full py-3">
                         {messages.map((message) => (
                             <ChatMessageRow key={message.id} variant={message.role}>
