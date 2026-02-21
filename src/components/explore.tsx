@@ -215,7 +215,7 @@ function ExploreComp() {
                     isSending={isLoading}
                     onInputChange={setCityInput}
                     onSend={handleCitySubmit}
-                    placeholder="Type a city name to get weather information"
+                    placeholder="Get your city weather..."
                 />
             </div>
         </Chat>
